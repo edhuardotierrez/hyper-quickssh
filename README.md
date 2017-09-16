@@ -1,6 +1,8 @@
 # Hyper Quick SSH
 > Plugin to show a Quick List of your favorites SSH or others shell commands in Hyper
 
+Simple to use: `Ctrl + O` or `(⌘ + O ` on mac) to show/hide
+
 ![](screenshot.png)
 
 ## Install
