@@ -1,0 +1,29 @@
+{
+  "name": "hyper-quickssh",
+  "version": "0.1.1",
+  "description": "Plugin to show a Quick List of your favorites SSH or others shell commands in Hyper",
+  "main": "index.js",
+  "license": "MIT",
+  "repository": "edhuardotierrez/hyper-quickssh",
+  "author": {
+    "name": "Edhuardo Tierrez",
+    "email": "edhuardo.tierrez@gmail.com"
+  },
+  "files": [
+    "index.js"
+  ],
+  "keywords": [
+    "hyper",
+    "hyperterm",
+    "hyper-quickssh",
+    "quickssh"
+  ],
+  "os": [
+    "!win32"
+  ],
+  "dependencies": {
+    "color": "^1.0.3",
+    "electron-log": "^2.2.9",
+    "fuzzy": "^0.1.3"
+  }
+}
