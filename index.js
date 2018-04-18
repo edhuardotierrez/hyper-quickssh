@@ -7,7 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const fuzzy = require('fuzzy');
 
-const DEBUG = process.env.NODE_ENV === 'development' || process.env.DEBUG || false;
+// const DEBUG = process.env.NODE_ENV === 'development' || process.env.DEBUG || false;
+const DEBUG = true
 const isMac = process.platform === 'darwin';
 
 let log = require('electron-log');
@@ -27,6 +28,7 @@ let reactHistoryNav;
 
 let allTerminals = {};
 let currTerminal;
+let currFocusedUid;
 
 let currPid = '';
 let currUserInputData = '';
@@ -38,6 +40,14 @@ let supressMode = false;
 let visor;
 let visibleQuickComponent = false;
 
+const navigation = { 
+    keys: {
+        up: 38,
+        down: 40
+    }  
+};
+
+/*
 exports.decorateMenu = menu =>
 menu.map(
   item => {
@@ -55,7 +65,7 @@ menu.map(
               if (focusedWindow) {
                 focusedWindow.rpc.emit('quickssh-open');
               } else {
-                createWindow(win => win.rpc.emit('quickssh-open'));
+                // createWindow(win => win.rpc.emit('quickssh-open'));
               }
             }
           },
@@ -66,7 +76,7 @@ menu.map(
                 if (focusedWindow) {
                     focusedWindow.rpc.emit('quickssh-open-config');
                   } else {
-                    createWindow(win => win.rpc.emit('quickssh-open-config'));
+                    // createWindow(win => win.rpc.emit('quickssh-open-config'));
                 }
             }
           }
@@ -76,6 +86,46 @@ menu.map(
     return newItem;
   }
 );
+
+*/
+
+
+const LEAD_KEY = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
+
+exports.decorateMenu = (menu) => 
+    menu.map(
+        item => {
+            if (item.label !== 'Plugins') return item;
+            const newItem = Object.assign({}, item);
+
+            newItem.submenu = newItem.submenu.concat(
+                {
+                label: 'Quick SSH',
+                type: 'submenu',
+                submenu:[
+                        {
+                        label: 'Show/Hide List',
+                        accelerator: `${LEAD_KEY}+O`,
+                        click: (clickedItem, focusedWindow) => {
+                            if (focusedWindow !== null) {
+                                focusedWindow.rpc.emit('hyper-quickssh:open:window', { focusedWindow });
+                            }
+                        }
+                    },
+                    {
+                        label: 'Open Config',
+                        click: (clickedItem, focusedWindow) => {
+                            if (focusedWindow !== null) {
+                                focusedWindow.rpc.emit('hyper-quickssh:open:config', { focusedWindow });
+                            }
+                        }
+                    }
+                ],
+            });
+            return newItem;
+        }
+    );
+
 
 exports.decorateConfig = (config) => {
 
@@ -263,7 +313,6 @@ exports.decorateConfig = (config) => {
             .hyper-quickssh__float:focus{ opacity: 0.9; }
         `
     });
-    //*/
 };
 
 function dirname (path) {
@@ -280,7 +329,7 @@ function openFilePrefs(e) {
     let filefull = getPrefsFile();
     let filedir  = dirname(filefull);
 
-    console.log(openFilePrefs);
+    // console.log(openFilePrefs);
     shell.openExternal('file://'+filedir);
 }
 
@@ -333,7 +382,8 @@ exports.decorateHyper = (Hyper, { React }) => {
             return (
                 React.createElement(Hyper, Object.assign({}, this.props, {
                     customChildren: 
-                        React.createElement('div', { className: `hyper-quickssh hidden`, id: 'id_hyper_quickssh', ref: 'quickssh' },
+                        React.createElement('div', { style: { display: 'false'}, className: `hyper-quickssh hidden`, id: 'id_hyper_quickssh', ref: 'quickssh' },
+                        // React.createElement('div', { className: `hyper-quickssh hidden`, id: 'id_hyper_quickssh', ref: 'quickssh' },
                             //React.createElement('div', { className: 'hyper-quickssh__float item_clickable', onClick:_ => this.handleFloatClick.bind(this)}, "+"),
                             //React.createElement('input', { type: 'text', value: '', id: 'id_hyper_quickssh_input', onKeyDown: this.handleKeyDown }),
                             React.createElement('div', { className: 'hyper-quickssh__prefs item_clickable', onClick: _ => { openFilePrefs(); } }, getPrefsFile()),
@@ -384,6 +434,7 @@ exports.middleware = (store) => (next) => (action) => {
                 reset();
                 return; //prevent input
             } else if (data.charCodeAt(0) === 13) {
+                currUserInputData = '';
                 toggleComponentWindow(false);
             } else if (data.charCodeAt(0) === 127) {
                 currUserInputData = (currUserInputData ? currUserInputData.slice(0, -1) : '').toString();
@@ -392,6 +443,14 @@ exports.middleware = (store) => (next) => (action) => {
                 currUserInputData += (data ? data : '').toString().toLowerCase();
                 currUserInputData.length === 0 ? reset() : getQuickList();
             }
+            // ctrl + c ?
+            if(charCode == 3)
+                currUserInputData = '';
+            
+            if(charCode == 27)
+                currUserInputData = '';
+            
+            console.log('charCode:', charCode);
             break;
         case 'SESSION_ADD':
             window.HYPER_HISTORY_TERM = currTerminal = allTerminals[action.uid];
@@ -406,18 +465,51 @@ exports.middleware = (store) => (next) => (action) => {
 };
 
 
-exports.decorateTerm = (Term, { React, notify }) => {
+exports.decorateTerm = (Term, { React }) => {
 
-    return class extends React.Component {
+    class HyperSSHTerm extends React.Component {
 
         constructor(props, context) {
             super(props, context);
-            this.onTerminal = this.onTerminal.bind(this, this);
+            // this.onTerminal = this.onTerminal.bind(this, this);
             this.isVisible = false;
+            this.handleOpenWindow = this.handleOpenWindow.bind(this);
+            this.handleOpenConfig = this.handleOpenConfig.bind(this);
             visibleQuickComponent = this.isVisible;
         }
 
+        componentDidMount() {
+            window.rpc.on('hyper-quickssh:open:window', this.handleOpenWindow);
+            window.rpc.on('hyper-quickssh:open:config', this.handleOpenConfig);
+        }
+
+        handleOpenWindow() {
+            const { sessions, term, uid, focussedSessionUid } = this.props;
+
+            // terminal config (new)
+            if (term != null)
+                allTerminals[focussedSessionUid] = term;
+
+            window.HYPER_HISTORY_TERM_ALL = allTerminals;
+            window.HYPER_HISTORY_TERM = currTerminal = term;
+            currFocusedUid = focussedSessionUid;
+
+            // update
+            getQuickList();
+            toggleComponentWindow();
+        }
+
+        handleOpenConfig() {
+            // update
+            openFilePrefs(this);
+        }
+
+        /*
         onTerminal(self, term) {
+
+            // log.info('onTerminal');
+            // const { term, uid, focussedSessionUid } = this.props;
+            
             if (self.props.onTerminal) self.props.onTerminal(term);
             allTerminals[self.props.uid] = term;
             window.HYPER_HISTORY_TERM_ALL = allTerminals;
@@ -433,11 +525,21 @@ exports.decorateTerm = (Term, { React, notify }) => {
                         if(e.keyCode === 27)
                             toggleComponentWindow();
 
-                            // seta direita ou baixo
+                        // seta direita ou baixo
                         if(quicksshEntries.length > 0){
-                            if (!e.metaKey && (e.keyCode === 39 || e.keyCode === 40)) {
+                            if (!e.metaKey && (e.keyCode === navigation.keys.down || e.keyCode === navigation.keys.up)) {
                                 e.preventDefault();
-                                return;
+
+                                var elview = getReactListNav();
+                                if(elview){
+                                    console.log(elview.refs);
+                                    elview.refs.quickssh.getDOMNode().focus();
+                                    //elview.focus();
+                                }
+
+                                console.log(e.keyCode);
+
+                                //return;
                             }
                         }
                     }
@@ -458,18 +560,8 @@ exports.decorateTerm = (Term, { React, notify }) => {
             term.keyboard.handlers_ = [handler].concat(term.keyboard.handlers_);
             term.installKeyboard();
 
-            // modal
-            // const modal = require(MODAL);
-            window.rpc.on('quickssh-open', () => {
-                // update
-                getQuickList();
-                toggleComponentWindow();
-            })
-            window.rpc.on('quickssh-open-config', () => {
-                // update
-                openFilePrefs(this);
-            });
         }
+        */
 
 
         render() {
@@ -480,6 +572,8 @@ exports.decorateTerm = (Term, { React, notify }) => {
         }
 
     };
+
+    return HyperSSHTerm;
 };
 
 
@@ -551,11 +645,8 @@ function saveQuickListConfig(quickssh){
 }
 
 function getQuickList() {
-    
-    if(!isVisibleComponent()){
-        reset();
-        return;
-    }
+
+    console.log(currUserInputData);
 
     let example = {
         icon: "default",
@@ -632,6 +723,10 @@ function isVisibleComponent(){
         return true;
 }
 
+function getReactListNav(){
+    return reactHistoryNav;
+}
+
 function toggleComponentWindow(isVisible){
 
     if(isVisible == undefined) isVisible = !isVisibleComponent();
@@ -642,15 +737,27 @@ function toggleComponentWindow(isVisible){
         // focus
         if(currTerminal) currTerminal.focus();
         el.classList.add('hidden'); 
+
+        // clean filter string
+        currUserInputData = '';
     }
 }
 
+function sendString(uid, data){
+    window.rpc.emit('data', {uid:uid, data: data, escaped: false});
+}
+
 function activeItem(entry) {
+
     supressMode = true;
     let command = entry.command;
-    currTerminal.io.sendString('\b'.repeat(currUserInputData.length));
-    currTerminal.io.sendString(command);
-    currTerminal.io.sendString('\n');
+    if (currFocusedUid != null){
+        sendString(currFocusedUid, '\b'.repeat(currUserInputData.length));
+        sendString(currFocusedUid, command + '\r');
+    }
+    // currTerminal.io.sendString('\b'.repeat(currUserInputData.length));
+    // currTerminal.io.sendString(command);
+    // currTerminal.io.sendString('\n');
     currUserInputData = '';
     quicksshEntries = [];
     updateReact();
@@ -668,3 +775,18 @@ function debug(...args) {
         log.info(...args);
     }
 }
+
+exports.mapTermsState = (state, map) => (
+    Object.assign(map, {
+      focussedSessionUid: state.sessions.activeUid
+    })
+);
+
+exports.passProps = (uid, parentProps, props) => (
+    Object.assign(props, {
+        focussedSessionUid: parentProps.focussedSessionUid
+    })
+);
+
+exports.getTermGroupProps = exports.passProps;
+exports.getTermProps = exports.passProps;
