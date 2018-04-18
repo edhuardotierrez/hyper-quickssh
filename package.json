@@ -1,6 +1,6 @@
 {
   "name": "hyper-quickssh",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Plugin to show a Quick List of your favorites SSH or others shell commands in Hyper",
   "main": "index.js",
   "license": "MIT",
