@@ -7,8 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const fuzzy = require('fuzzy');
 
-// const DEBUG = process.env.NODE_ENV === 'development' || process.env.DEBUG || false;
-const DEBUG = true
+const DEBUG = process.env.NODE_ENV === 'development' || process.env.DEBUG || false;
 const isMac = process.platform === 'darwin';
 
 let log = require('electron-log');
@@ -46,49 +45,6 @@ const navigation = {
         down: 40
     }  
 };
-
-/*
-exports.decorateMenu = menu =>
-menu.map(
-  item => {
-    if (item.label !== 'Plugins') return item;
-    const newItem = Object.assign({}, item);
-    newItem.submenu = newItem.submenu.concat(
-      {
-        label: 'Quick SSH',
-        type: 'submenu',
-        submenu:[
-          {
-            label: 'Show/Hide List',
-            accelerator: 'CmdOrCtrl+O',
-            click: (clickedItem, focusedWindow) => {
-              if (focusedWindow) {
-                focusedWindow.rpc.emit('quickssh-open');
-              } else {
-                // createWindow(win => win.rpc.emit('quickssh-open'));
-              }
-            }
-          },
-          {
-            label: 'Open Config',
-            //accelerator: 'CmdOrCtrl+O',
-            click: (clickedItem, focusedWindow) => {
-                if (focusedWindow) {
-                    focusedWindow.rpc.emit('quickssh-open-config');
-                  } else {
-                    // createWindow(win => win.rpc.emit('quickssh-open-config'));
-                }
-            }
-          }
-        ]
-      }
-    );
-    return newItem;
-  }
-);
-
-*/
-
 
 const LEAD_KEY = process.platform === 'darwin' ? 'Cmd' : 'Ctrl';
 
@@ -329,7 +285,6 @@ function openFilePrefs(e) {
     let filefull = getPrefsFile();
     let filedir  = dirname(filefull);
 
-    // console.log(openFilePrefs);
     shell.openExternal('file://'+filedir);
 }
 
@@ -356,24 +311,6 @@ exports.decorateHyper = (Hyper, { React }) => {
         handlePrefsClick(e){ 
             openFilePrefs(e);
         }
-        /*
-        handleKeyDown(e) {
-
-            const { cursor, result } = this.state
-            // arrow up/down button should select next/previous list element
-            if (e.keyCode === 38 && cursor > 0) {
-              this.setState( prevState => ({
-                cursor: prevState.cursor - 1
-              }))
-            } else if (e.keyCode === 40 && cursor < result.length - 1) {
-              this.setState( prevState => ({
-                cursor: prevState.cursor + 1
-              }))
-            } else if (e.keyCode === 27 && isVisibleComponent()){
-                toggleComponentWindow();
-            }
-          }
-        //*/
         render() {
             const color = require('color');
             const { cursor } = this.state;
@@ -383,9 +320,6 @@ exports.decorateHyper = (Hyper, { React }) => {
                 React.createElement(Hyper, Object.assign({}, this.props, {
                     customChildren: 
                         React.createElement('div', { style: { display: 'false'}, className: `hyper-quickssh hidden`, id: 'id_hyper_quickssh', ref: 'quickssh' },
-                        // React.createElement('div', { className: `hyper-quickssh hidden`, id: 'id_hyper_quickssh', ref: 'quickssh' },
-                            //React.createElement('div', { className: 'hyper-quickssh__float item_clickable', onClick:_ => this.handleFloatClick.bind(this)}, "+"),
-                            //React.createElement('input', { type: 'text', value: '', id: 'id_hyper_quickssh_input', onKeyDown: this.handleKeyDown }),
                             React.createElement('div', { className: 'hyper-quickssh__prefs item_clickable', onClick: _ => { openFilePrefs(); } }, getPrefsFile()),
                             React.createElement('div', { className: 'hyper-quickssh-list' },
                                 ...quicksshEntries.map(entry => {
@@ -450,7 +384,6 @@ exports.middleware = (store) => (next) => (action) => {
             if(charCode == 27)
                 currUserInputData = '';
             
-            console.log('charCode:', charCode);
             break;
         case 'SESSION_ADD':
             window.HYPER_HISTORY_TERM = currTerminal = allTerminals[action.uid];
@@ -503,66 +436,6 @@ exports.decorateTerm = (Term, { React }) => {
             // update
             openFilePrefs(this);
         }
-
-        /*
-        onTerminal(self, term) {
-
-            // log.info('onTerminal');
-            // const { term, uid, focussedSessionUid } = this.props;
-            
-            if (self.props.onTerminal) self.props.onTerminal(term);
-            allTerminals[self.props.uid] = term;
-            window.HYPER_HISTORY_TERM_ALL = allTerminals;
-            window.HYPER_HISTORY_TERM = currTerminal = term;
-
-            const handler = [
-                "keydown",
-                function(e) {
-
-                    lastKeyCodeTerminal = e.keyCode;
-                    if(isVisibleComponent()){
-
-                        if(e.keyCode === 27)
-                            toggleComponentWindow();
-
-                        // seta direita ou baixo
-                        if(quicksshEntries.length > 0){
-                            if (!e.metaKey && (e.keyCode === navigation.keys.down || e.keyCode === navigation.keys.up)) {
-                                e.preventDefault();
-
-                                var elview = getReactListNav();
-                                if(elview){
-                                    console.log(elview.refs);
-                                    elview.refs.quickssh.getDOMNode().focus();
-                                    //elview.focus();
-                                }
-
-                                console.log(e.keyCode);
-
-                                //return;
-                            }
-                        }
-                    }
-
-                    if (e.metaKey && e.keyCode === 79) {
-                        e.preventDefault();
-
-                        this.isVisible = !isVisibleComponent();
-                        toggleComponentWindow();
-                        getQuickList();
-                        //this.terminal.io.sendString('cmd');
-
-                    }
-                }.bind(term.keyboard)
-            ];
-    
-            term.uninstallKeyboard();
-            term.keyboard.handlers_ = [handler].concat(term.keyboard.handlers_);
-            term.installKeyboard();
-
-        }
-        */
-
 
         render() {
             let props = Object.assign({}, this.props, {
@@ -645,8 +518,6 @@ function saveQuickListConfig(quickssh){
 }
 
 function getQuickList() {
-
-    console.log(currUserInputData);
 
     let example = {
         icon: "default",
@@ -755,9 +626,7 @@ function activeItem(entry) {
         sendString(currFocusedUid, '\b'.repeat(currUserInputData.length));
         sendString(currFocusedUid, command + '\r');
     }
-    // currTerminal.io.sendString('\b'.repeat(currUserInputData.length));
-    // currTerminal.io.sendString(command);
-    // currTerminal.io.sendString('\n');
+
     currUserInputData = '';
     quicksshEntries = [];
     updateReact();
